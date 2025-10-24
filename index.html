@@ -18,6 +18,8 @@
             primary: '#4F46E5', // 深紫蓝色，更显专业
             secondary: '#10B981',
             tertiary: '#EC4899', // 亮粉色，区分同时去除功能
+            quaternary: '#8B5CF6', // 新按钮颜色1
+            quinary: '#F59E0B', // 新按钮颜色2
             neutral: '#1F2937',
           },
           fontFamily: {
@@ -192,6 +194,20 @@
         >
           <i class="fa fa-magic mr-2"></i>同时去除
         </button>
+        <!-- 新增按钮1：去除所有括号内容 -->
+        <button 
+          id="removeAllBrackets" 
+          class="btn-effect bg-quaternary hover:bg-quaternary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-parenthesis mr-2"></i>去除所有括号
+        </button>
+        <!-- 新增按钮2：去除顺序词及其标点 -->
+        <button 
+          id="removeSequenceWords" 
+          class="btn-effect bg-quinary hover:bg-quinary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-list-ol mr-2"></i>去除顺序词
+        </button>
         <button 
           id="copyResult" 
           class="btn-effect bg-gray-700 hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
@@ -225,6 +241,14 @@
           <i class="fa fa-check-circle text-tertiary mt-1 mr-3"></i>
           <span><strong>同时去除：</strong>一次性执行上述两种操作，先去除空行再处理含数字的方括号。</span>
         </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-quaternary mt-1 mr-3"></i>
+          <span><strong>去除所有括号：</strong>删除文本中所有括号及其内容，包括圆括号()、方括号[]、花括号{}等。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-quinary mt-1 mr-3"></i>
+          <span><strong>去除顺序词：</strong>删除"首先"、"其次"、"再次"、"此外"、"同时"、"最后"等顺序词及其后面的标点符号。</span>
+        </li>
       </ul>
     </div>
     
@@ -245,6 +269,8 @@
     const removeEmptyLinesBtn = document.getElementById('removeEmptyLines');
     const removeNumberBracketsBtn = document.getElementById('removeNumberBrackets');
     const removeBothBtn = document.getElementById('removeBoth');
+    const removeAllBracketsBtn = document.getElementById('removeAllBrackets'); // 新按钮1
+    const removeSequenceWordsBtn = document.getElementById('removeSequenceWords'); // 新按钮2
     const copyResultBtn = document.getElementById('copyResult');
     const clearAllBtn = document.getElementById('clearAll');
     const notification = document.getElementById('notification');
@@ -335,7 +361,7 @@
       setFullScreenWatermark(ip);
     });
     
-    // 以下所有功能（去除空行、去方括号、复制等）均保持原样，未做任何修改
+    // 原有功能保持不变
     function removeEmptyLines() {
       if (!originalText.value.trim()) {
         showNotification('请先输入文本内容', 'warning');
@@ -369,6 +395,30 @@
       filteredText = filteredText.replace(regex, '');
       modifiedText.value = filteredText;
       showNotification('已同时去除空行和含数字的方括号', 'success');
+    }
+    
+    // 新增功能1：去除所有括号内容
+    function removeAllBrackets() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      // 匹配所有括号及其内容：圆括号()、方括号[]、花括号{}
+      const regex = /[\(\[{][^\)\]}]*[\)\]}]/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      showNotification('已成功去除所有括号内容', 'success');
+    }
+    
+    // 新增功能2：去除顺序词及其标点符号
+    function removeSequenceWords() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      // 匹配顺序词及其后面的标点符号
+      const regex = /(首先|其次|再次|此外|同时|最后)[，,、。\.；;：:]*\s*/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      showNotification('已成功去除顺序词及其标点符号', 'success');
     }
     
     function copyResult() {
@@ -417,16 +467,18 @@
       }, 3000);
     }
     
-    // 绑定事件监听（不变）
+    // 绑定事件监听
     removeEmptyLinesBtn.addEventListener('click', removeEmptyLines);
     removeNumberBracketsBtn.addEventListener('click', removeNumberBrackets);
     removeBothBtn.addEventListener('click', removeBoth);
+    removeAllBracketsBtn.addEventListener('click', removeAllBrackets);
+    removeSequenceWordsBtn.addEventListener('click', removeSequenceWords);
     copyResultBtn.addEventListener('click', copyResult);
     clearAllBtn.addEventListener('click', clearAll);
     
     originalText.focus();
     
-    // 键盘快捷键（不变）
+    // 键盘快捷键
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
@@ -439,6 +491,15 @@
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         removeBoth();
+      }
+      // 新增快捷键
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        removeAllBrackets();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        removeSequenceWords();
       }
     });
   </script>
