@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本处理工具</title>
+  <!-- 引入Tailwind CSS -->
+<link href="./css/tailwind.min.css" rel="stylesheet">
+  <!-- 引入Font Awesome -->
+  <link href="./css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- 配置Tailwind自定义颜色和字体 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4F46E5', // 深紫蓝色，更显专业
+            secondary: '#10B981',
+            tertiary: '#EC4899', // 亮粉色，区分同时去除功能
+            neutral: '#1F2937',
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .card-hover {
+        transition: all 0.3s ease;
+      }
+      .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.1);
+      }
+    }
+  </style>
+  
+  <style>
+    /* 全局样式 */
+    body {
+      background-color: #f9fafb;
+      background-image: 
+        radial-gradient(at 40% 20%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.05) 0px, transparent 50%);
+    }
+    
+    /* 文本框样式 */
+    textarea {
+      resize: vertical;
+      min-height: 280px;
+      max-height: 500px;
+      line-height: 1.6;
+    }
+    
+    /* 按钮动画效果 */
+    .btn-effect {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-effect:hover {
+      transform: translateY(-2px);
+    }
+    
+    .btn-effect::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      transform: scale(0, 0) translate(-50%, -50%);
+      opacity: 0;
+    }
+    
+    .btn-effect:active::after {
+      animation: ripple 0.6s ease-out;
+    }
+    
+    @keyframes ripple {
+      0% {
+        transform: scale(0, 0) translate(-50%, -50%);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(50, 50) translate(-50%, -50%);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen font-inter text-neutral antialiased">
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- 页面标题 -->
+    <header class="text-center mb-10">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-primary mb-3 text-shadow">文本处理工具</h1>
+      <p class="text-gray-600 max-w-2xl mx-auto">高效处理文本内容，支持去除空行、删除含数字的方括号或同时执行两种操作</p>
+    </header>
+    
+    <main class="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-10 card-hover">
+      <!-- 文本框区域 - 左右布局，增加间距 -->
+      <div class="flex flex-col md:flex-row gap-8 mb-10">
+        <!-- 输入区域 - 增加卡片感 -->
+        <div class="flex-1">
+          <label for="originalText" class="block text-lg font-medium text-gray-700 mb-3 flex items-center">
+            <i class="fa fa-file-text-o mr-2 text-primary"></i>原文本
+          </label>
+          <div class="relative">
+            <textarea 
+              id="originalText" 
+              class="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none shadow-sm transition-all"
+              placeholder="请输入需要处理的文本内容..."
+            ></textarea>
+            <!-- 装饰性元素 -->
+            <div class="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 border-primary/20 rounded-br-xl"></div>
+          </div>
+        </div>
+        
+        <!-- 输出区域 -->
+        <div class="flex-1">
+          <label for="modifiedText" class="block text-lg font-medium text-gray-700 mb-3 flex items-center">
+            <i class="fa fa-file-text mr-2 text-secondary"></i>处理后的文本
+          </label>
+          <div class="relative">
+            <textarea 
+              id="modifiedText" 
+              class="w-full px-4 py-4 border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none shadow-sm transition-all"
+              placeholder="处理后的文本将显示在这里..."
+              readonly
+            ></textarea>
+            <!-- 装饰性元素 -->
+            <div class="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 border-secondary/20 rounded-br-xl"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 按钮区域 - 优化布局，避免遮挡 -->
+      <div class="flex flex-wrap justify-center gap-4 md:gap-6 py-2">
+        <button 
+          id="removeEmptyLines" 
+          class="btn-effect bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-eraser mr-2"></i>去除空行
+        </button>
+        <button 
+          id="removeNumberBrackets" 
+          class="btn-effect bg-secondary hover:bg-secondary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-square-o mr-2"></i>去除含数字的[]
+        </button>
+        <button 
+          id="removeBoth" 
+          class="btn-effect bg-tertiary hover:bg-tertiary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-magic mr-2"></i>同时去除
+        </button>
+        <button 
+          id="copyResult" 
+          class="btn-effect bg-gray-700 hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-copy mr-2"></i>复制结果
+        </button>
+        <button 
+          id="clearAll" 
+          class="btn-effect bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-trash mr-2"></i>清空全部
+        </button>
+      </div>
+    </main>
+    
+    <!-- 说明区域 - 卡片式设计 -->
+    <div class="bg-white rounded-xl p-6 shadow-md mb-12">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+        <i class="fa fa-info-circle text-primary mr-2"></i>功能说明
+      </h2>
+      <ul class="space-y-3 text-gray-600">
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-primary mt-1 mr-3"></i>
+          <span><strong>去除空行：</strong>删除文本中所有空行，包括连续的空行，保留有效内容的排版结构。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+          <span><strong>去除含数字的[]：</strong>智能识别并删除包含数字的方括号（如[123]、[45a6]），保留仅包含字母的方括号（如[abc]）。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-tertiary mt-1 mr-3"></i>
+          <span><strong>同时去除：</strong>一次性执行上述两种操作，先去除空行再处理含数字的方括号。</span>
+        </li>
+      </ul>
+    </div>
+    
+    <!-- 页脚 -->
+    <footer class="text-center text-gray-500 text-sm pb-6">
+      <p>© 2025 Vincent. 版权所有</p>
+    </footer>
+  </div>
+
+  <!-- 通知提示组件 -->
+  <div id="notification" class="fixed bottom-6 right-6 px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50"></div>
+
+  <!-- JavaScript功能实现 -->
+  <script>
+    // 获取DOM元素
+    const originalText = document.getElementById('originalText');
+    const modifiedText = document.getElementById('modifiedText');
+    const removeEmptyLinesBtn = document.getElementById('removeEmptyLines');
+    const removeNumberBracketsBtn = document.getElementById('removeNumberBrackets');
+    const removeBothBtn = document.getElementById('removeBoth');
+    const copyResultBtn = document.getElementById('copyResult');
+    const clearAllBtn = document.getElementById('clearAll');
+    const notification = document.getElementById('notification');
+    
+    // 去除空行功能
+    function removeEmptyLines() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      
+      // 按行分割文本，过滤掉空行，再重新拼接
+      const lines = originalText.value.split('\n');
+      const filteredLines = lines.filter(line => line.trim() !== '');
+      modifiedText.value = filteredLines.join('\n');
+      
+      showNotification('已成功去除空行', 'success');
+    }
+    
+    // 去除包含数字的[]
+    function removeNumberBrackets() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      
+      // 正则表达式：匹配包含至少一个数字的方括号
+      const regex = /\[[^\]]*\d+[^\]]*\]/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      
+      showNotification('已成功去除含数字的方括号', 'success');
+    }
+    
+    // 同时去除空行和含数字的[]
+    function removeBoth() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      
+      // 先去除空行
+      let text = originalText.value;
+      const lines = text.split('\n');
+      let filteredText = lines.filter(line => line.trim() !== '').join('\n');
+      
+      // 再去除含数字的方括号
+      const regex = /\[[^\]]*\d+[^\]]*\]/g;
+      filteredText = filteredText.replace(regex, '');
+      
+      modifiedText.value = filteredText;
+      showNotification('已同时去除空行和含数字的方括号', 'success');
+    }
+    
+    // 复制结果到剪贴板
+    function copyResult() {
+      if (!modifiedText.value.trim()) {
+        showNotification('没有可复制的内容', 'warning');
+        return;
+      }
+      
+      modifiedText.select();
+      document.execCommand('copy');
+      
+      showNotification('结果已复制到剪贴板', 'success');
+    }
+    
+    // 清空所有文本
+    function clearAll() {
+      originalText.value = '';
+      modifiedText.value = '';
+      originalText.focus();
+      
+      showNotification('已清空所有内容', 'info');
+    }
+    
+    // 显示通知
+    function showNotification(message, type = 'info') {
+      // 设置样式和内容
+      let bgColor, icon;
+      switch(type) {
+        case 'success':
+          bgColor = 'bg-green-500';
+          icon = 'fa-check-circle';
+          break;
+        case 'warning':
+          bgColor = 'bg-amber-500';
+          icon = 'fa-exclamation-triangle';
+          break;
+        case 'error':
+          bgColor = 'bg-red-500';
+          icon = 'fa-times-circle';
+          break;
+        default:
+          bgColor = 'bg-blue-500';
+          icon = 'fa-info-circle';
+      }
+      
+      // 更新通知元素
+      notification.className = `fixed bottom-6 right-6 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50`;
+      notification.innerHTML = `<i class="fa ${icon} mr-2"></i>${message}`;
+      
+      // 显示动画
+      setTimeout(() => {
+        notification.classList.remove('translate-y-20', 'opacity-0');
+      }, 10);
+      
+      // 3秒后隐藏
+      setTimeout(() => {
+        notification.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+    
+    // 绑定事件监听
+    removeEmptyLinesBtn.addEventListener('click', removeEmptyLines);
+    removeNumberBracketsBtn.addEventListener('click', removeNumberBrackets);
+    removeBothBtn.addEventListener('click', removeBoth);
+    copyResultBtn.addEventListener('click', copyResult);
+    clearAllBtn.addEventListener('click', clearAll);
+    
+    // 初始聚焦到原文本框
+    originalText.focus();
+    
+    // 键盘快捷键支持
+    document.addEventListener('keydown', (e) => {
+      // Ctrl+Shift+L 去除空行
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        removeEmptyLines();
+      }
+      
+      // Ctrl+Shift+B 去除含数字的[]
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        removeNumberBrackets();
+      }
+      
+      // Ctrl+Shift+A 同时去除
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        removeBoth();
+      }
+    });
+  </script>
+</body>
+</html>
