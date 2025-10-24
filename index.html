@@ -59,7 +59,7 @@
       margin: 0; /* 清除默认边距，避免水印偏移 */
     }
     
-    /* 全屏IP水印样式（仅改为灰色，其他样式不变） */
+    /* 全屏IP水印样式 */
     #ipWatermark {
       position: fixed;
       top: 0;
@@ -75,12 +75,13 @@
       overflow: hidden; /* 防止水印溢出 */
     }
     
-    /* 文本框样式 */
+    /* 文本框样式 - 添加黑色实线边框 */
     textarea {
       resize: vertical;
       min-height: 280px;
       max-height: 500px;
       line-height: 1.6;
+      border: 2px solid #000000 !important; /* 添加黑色实线边框 */
     }
     
     /* 按钮动画效果 */
@@ -124,7 +125,7 @@
   </style>
 </head>
 <body class="min-h-screen font-inter text-neutral antialiased">
-  <!-- IP水印容器（仅颜色改为灰色） -->
+  <!-- IP水印容器 -->
   <div id="ipWatermark"></div>
 
   <div class="container mx-auto px-4 py-8 max-w-6xl relative z-20"> <!-- 内容层级低于水印 -->
@@ -249,7 +250,38 @@
     const notification = document.getElementById('notification');
     const ipWatermark = document.getElementById('ipWatermark'); // 水印元素
     
-    // -------------------------- 仅修改水印颜色为灰色，其他逻辑不变 --------------------------
+    // 根据屏幕大小计算水印数量和字体大小
+    function calculateWatermarkDensity() {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      
+      // 根据屏幕大小计算水印密度
+      // 基础字体大小
+      let fontSize = 1.1; // 基础vw单位
+      let horizontalCount = 40; // 基础水平数量
+      let verticalCount = 25; // 基础垂直数量
+      
+      // 根据屏幕大小调整密度
+      if (screenWidth < 768) {
+        // 小屏幕设备
+        fontSize = 1.0;
+        horizontalCount = 25;
+        verticalCount = 15;
+      } else if (screenWidth >= 768 && screenWidth < 1200) {
+        // 中等屏幕设备
+        fontSize = 1.1;
+        horizontalCount = 35;
+        verticalCount = 20;
+      } else {
+        // 大屏幕设备
+        fontSize = 1.2;
+        horizontalCount = 50;
+        verticalCount = 30;
+      }
+      
+      return { fontSize, horizontalCount, verticalCount };
+    }
+    
     // 获取公网IP并生成全屏版权水印
     async function getIPAndSetWatermark() {
       try {
@@ -266,38 +298,42 @@
     // 生成全屏覆盖的版权水印（颜色改为#888888灰色）
     function setFullScreenWatermark(ip) {
       const watermarkText = `© Vincent 版权所有 - ${ip}`;
+      
+      // 根据屏幕大小计算水印密度
+      const { fontSize, horizontalCount, verticalCount } = calculateWatermarkDensity();
+      
       const watermarkStyle = `
         background-image: linear-gradient(
           45deg, 
           #888888 0%, /* 改为中灰色，视觉更柔和 */
           #888888 100%
         );
-        background-size: 120px 80px; /* 保留原尺寸，确保密集覆盖 */
+        background-size: ${100 / horizontalCount}% ${100 / verticalCount}%;
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
-        font-size: 1.1vw; /* 保留原字体大小 */
+        font-size: ${fontSize}vw; /* 根据屏幕大小调整字体 */
         font-weight: 600; /* 保留原字重 */
         white-space: nowrap;
         letter-spacing: 0.5px;
       `;
       
-      const horizontalRepeat = Array(60).fill(` ${watermarkText} `).join('');
-      const fullScreenText = Array(40).fill(horizontalRepeat).join('\n');
+      // 根据计算的数量生成水印文本
+      const horizontalRepeat = Array(horizontalCount).fill(` ${watermarkText} `).join('');
+      const fullScreenText = Array(verticalCount).fill(horizontalRepeat).join('\n');
       
       ipWatermark.style.cssText = watermarkStyle;
       ipWatermark.innerText = fullScreenText;
       ipWatermark.offsetHeight;
     }
     
-    // 页面加载和窗口变化监听（逻辑不变）
+    // 页面加载和窗口变化监听
     document.addEventListener('DOMContentLoaded', getIPAndSetWatermark);
     window.addEventListener('resize', () => {
       const currentText = ipWatermark.innerText.split('\n')[0] || '© Vincent 版权所有';
       const ip = currentText.includes(' - ') ? currentText.split(' - ')[1] : currentText;
       setFullScreenWatermark(ip);
     });
-    // -------------------------- 颜色修改结束 --------------------------
     
     // 以下所有功能（去除空行、去方括号、复制等）均保持原样，未做任何修改
     function removeEmptyLines() {
