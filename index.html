@@ -416,7 +416,7 @@
         return;
       }
       // 匹配顺序词及其后面的标点符号
-      const regex = /(首先|其次|再次|此外|同时|最后)[，,、。\.；;：:]*\s*/g;
+      const regex = /(首先|其次|再次|此外|同时|最后|另外)[，,、。\.；;：:]*\s*/g;
       modifiedText.value = originalText.value.replace(regex, '');
       showNotification('已成功去除顺序词及其标点符号', 'success');
     }
@@ -505,3 +505,4 @@
   </script>
 </body>
 </html>
+
