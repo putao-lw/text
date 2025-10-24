@@ -55,6 +55,23 @@
         radial-gradient(at 40% 20%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
         radial-gradient(at 80% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
         radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.05) 0px, transparent 50%);
+      position: relative; /* 为水印定位做准备 */
+      margin: 0; /* 清除默认边距，避免水印偏移 */
+    }
+    
+    /* 全屏IP水印样式（优化后） */
+    #ipWatermark {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw; /* 100%视口宽度 */
+      height: 100vh; /* 100%视口高度 */
+      z-index: 1; /* 低于内容层，不干扰操作 */
+      pointer-events: none; /* 穿透点击，不影响下层元素 */
+      background-repeat: repeat; /* 重复排列水印 */
+      opacity: 0.1; /* 半透明，避免遮挡内容 */
+      margin: 0;
+      padding: 0;
     }
     
     /* 文本框样式 */
@@ -106,7 +123,10 @@
   </style>
 </head>
 <body class="min-h-screen font-inter text-neutral antialiased">
-  <div class="container mx-auto px-4 py-8 max-w-6xl">
+  <!-- IP水印容器（动态填充内容） -->
+  <div id="ipWatermark"></div>
+
+  <div class="container mx-auto px-4 py-8 max-w-6xl relative z-20"> <!-- 提高内容层级，覆盖水印 -->
     <!-- 页面标题 -->
     <header class="text-center mb-10">
       <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-primary mb-3 text-shadow">文本处理工具</h1>
@@ -226,6 +246,65 @@
     const copyResultBtn = document.getElementById('copyResult');
     const clearAllBtn = document.getElementById('clearAll');
     const notification = document.getElementById('notification');
+    const ipWatermark = document.getElementById('ipWatermark'); // 水印元素
+    
+    // -------------------------- 优化：IP水印生成逻辑 --------------------------
+    // 获取公网IP并生成全屏水印
+    async function getIPAndSetWatermark() {
+      try {
+        // 调用第三方API获取IP（免费无跨域限制）
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        const userIP = data.ip || 'Unknown IP';
+        setFullScreenWatermark(userIP); // 生成全屏水印
+      } catch (error) {
+        // 失败时显示默认文本
+        setFullScreenWatermark('无法获取IP');
+        console.error('IP获取失败：', error);
+      }
+    }
+    
+    // 生成全屏覆盖的水印（优化核心）
+    function setFullScreenWatermark(text) {
+      // 1. 缩小背景尺寸，增加重复密度，确保无空白
+      // 2. 用vw单位适配字体，不同屏幕比例一致
+      // 3. 旋转45度让水印分布更均匀
+      const watermarkStyle = `
+        background-image: linear-gradient(
+          45deg, 
+          #4F46E5 0%, 
+          #4F46E5 100%
+        );
+        background-size: 150px 100px; // 缩小尺寸，密集重复
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: 1.2vw; // 屏幕宽度百分比，适配不同尺寸
+        font-weight: 500;
+        white-space: nowrap; // 防止文本换行
+      `;
+      
+      // 生成大量重复文本，确保横向/纵向完全覆盖（增加到50次）
+      const repeatText = Array(50).fill(` ${text} `).join('');
+      // 纵向重复：通过换行增加纵向覆盖，避免顶部/底部空白
+      const fullText = Array(30).fill(repeatText).join('\n');
+      
+      // 应用样式和文本
+      ipWatermark.style.cssText = watermarkStyle;
+      ipWatermark.innerText = fullText;
+      
+      // 强制刷新水印布局，确保立即生效
+      ipWatermark.offsetHeight; // 触发重排
+    }
+    
+    // 页面加载完成后获取IP并生成水印，同时监听窗口 resize 确保全屏
+    document.addEventListener('DOMContentLoaded', getIPAndSetWatermark);
+    window.addEventListener('resize', () => {
+      // 窗口大小变化时，重新生成水印，避免拉伸变形
+      const currentText = ipWatermark.innerText.split('\n')[0].split('  ')[1] || '无法获取IP';
+      setFullScreenWatermark(currentText);
+    });
+    // -------------------------- 优化结束 --------------------------
     
     // 去除空行功能
     function removeEmptyLines() {
