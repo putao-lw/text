@@ -276,6 +276,575 @@
     const notification = document.getElementById('notification');
     const ipWatermark = document.getElementById('ipWatermark'); // 水印元素
     
+    // 存储用户位置信息
+    let userLocation = { longitude: null, latitude: null };
+    
+    // 根据屏幕大小计算水印数量和字体大小
+    function calculateWatermarkDensity() {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      
+      // 根据屏幕大小计算水印密度
+      // 基础字体大小
+      let fontSize = 1.1; // 基础vw单位
+      let horizontalCount = 40; // 基础水平数量
+      let verticalCount = 25; // 基础垂直数量
+      
+      // 根据屏幕大小调整密度
+      if (screenWidth < 768) {
+        // 小屏幕设备
+        fontSize = 1.0;
+        horizontalCount = 25;
+        verticalCount = 15;
+      } else if (screenWidth >= 768 && screenWidth < 1200) {
+        // 中等屏幕设备
+        fontSize = 1.1;
+        horizontalCount = 35;
+        verticalCount = 20;
+      } else {
+        // 大屏幕设备
+        fontSize = 1.2;
+        horizontalCount = 50;
+        verticalCount = 30;
+      }
+      
+      return { fontSize, horizontalCount, verticalCount };
+    }
+    
+    // 获取用户位置信息
+    function getUserLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('浏览器不支持地理位置服务'));
+          return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            userLocation.longitude = position.coords.longitude.toFixed(6);
+            userLocation.latitude = position.coords.latitude.toFixed(6);
+            resolve(userLocation);
+          },
+          (error) => {
+            let errorMessage = '无法获取位置信息';
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = '用户拒绝位置访问请求';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = '位置信息不可用';
+                break;
+              case error.TIMEOUT:
+                errorMessage = '获取位置信息超时';
+                break;
+            }
+            reject(new Error(errorMessage));
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      });
+    }
+    
+    // 获取公网IP并生成全屏版权水印
+    async function getIPAndSetWatermark() {
+      try {
+        const [ipResponse, location] = await Promise.allSettled([
+          fetch('https://api.ipify.org?format=json'),
+          getUserLocation()
+        ]);
+        
+        let userIP = 'Unknown IP';
+        let locationText = '';
+        
+        if (ipResponse.status === 'fulfilled') {
+          const data = await ipResponse.value.json();
+          userIP = data.ip || 'Unknown IP';
+        }
+        
+        if (location.status === 'fulfilled') {
+          const loc = location.value;
+          locationText = ` J:${loc.longitude} W:${loc.latitude}`;
+        } else {
+          console.error('位置获取失败：', location.reason);
+        }
+        
+        setFullScreenWatermark(userIP, locationText);
+      } catch (error) {
+        console.error('初始化失败：', error);
+        setFullScreenWatermark('Unknown IP', '');
+      }
+    }
+    
+    // 生成全屏覆盖的版权水印（颜色改为#888888灰色）
+    function setFullScreenWatermark(ip, locationText) {
+      const watermarkText = `© Vincent 版权所有 - IP:${ip}${locationText}`;
+      
+      // 根据屏幕大小计算水印密度
+      const { fontSize, horizontalCount, verticalCount } = calculateWatermarkDensity();
+      
+      const watermarkStyle = `
+        background-image: linear-gradient(
+          45deg, 
+          #888888 0%, /* 改为中灰色，视觉更柔和 */
+          #888888 100%
+        );
+        background-size: ${100 / horizontalCount}% ${100 / verticalCount}%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: ${fontSize}vw; /* 根据屏幕大小调整字体 */
+        font-weight: 600; /* 保留原字重 */
+        white-space: nowrap;
+        letter-spacing: 0.5px;
+      `;
+      
+      // 根据计算的数量生成水印文本
+      const horizontalRepeat = Array(horizontalCount).fill(` ${watermarkText} `).join('');
+      const fullScreenText = Array(verticalCount).fill(horizontalRepeat).join('\n');
+      
+      ipWatermark.style.cssText = watermarkStyle;
+      ipWatermark.innerText = fullScreenText;
+      ipWatermark.offsetHeight;
+    }
+    
+    // 页面加载和窗口变化监听
+    document.addEventListener('DOMContentLoaded', getIPAndSetWatermark);
+    window.addEventListener('resize', () => {
+      // 重新设置水印以适应新的屏幕尺寸
+      const currentText = ipWatermark.innerText.split('\n')[0] || '© Vincent 版权所有';
+      const matches = currentText.match(/IP:([^ ]+)( J:[^ ]+ W:[^ ]+)?/);
+      if (matches) {
+        const ip = matches[1];
+        const locationText = matches[2] || '';
+        setFullScreenWatermark(ip, locationText);
+      }
+    });
+    
+    // 原有功能保持不变
+    function removeEmptyLines() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      const lines = originalText.value.split('\n');
+      const filteredLines = lines.filter(line => line.trim() !== '');
+      modifiedText.value = filteredLines.join('\n');
+      showNotification('已成功去除空行', 'success');
+    }
+    
+    function removeNumberBrackets() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      const regex = /\[[^\]]*\d+[^\]]*\]/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      showNotification('已成功去除含数字的方括号', 'success');
+    }
+    
+    function removeBoth() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      let text = originalText.value;
+      const lines = text.split('\n');
+      let filteredText = lines.filter(line => line.trim() !== '').join('\n');
+      const regex = /\[[^\]]*\d+[^\]]*\]/g;
+      filteredText = filteredText.replace(regex, '');
+      modifiedText.value = filteredText;
+      showNotification('已同时去除空行和含数字的方括号', 'success');
+    }
+    
+    // 新增功能1：去除所有圆括号内容（仅圆括号，不包括其他括号）
+    function removeAllParentheses() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      // 匹配所有圆括号及其内容，包括中文（）和英文()圆括号
+      const regex = /[\(（][^\)）]*[\)）]/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      showNotification('已成功去除所有圆括号内容', 'success');
+    }
+    
+    // 新增功能2：去除顺序词及其标点符号
+    function removeSequenceWords() {
+      if (!originalText.value.trim()) {
+        showNotification('请先输入文本内容', 'warning');
+        return;
+      }
+      // 匹配顺序词及其后面的标点符号
+      const regex = /(首先|其次|再次|此外|同时|最后)[，,、。\.；;：:]*\s*/g;
+      modifiedText.value = originalText.value.replace(regex, '');
+      showNotification('已成功去除顺序词及其标点符号', 'success');
+    }
+    
+    function copyResult() {
+      if (!modifiedText.value.trim()) {
+        showNotification('没有可复制的内容', 'warning');
+        return;
+      }
+      modifiedText.select();
+      document.execCommand('copy');
+      showNotification('结果已复制到剪贴板', 'success');
+    }
+    
+    function clearAll() {
+      originalText.value = '';
+      modifiedText.value = '';
+      originalText.focus();
+      showNotification('已清空所有内容', 'info');
+    }
+    
+    function showNotification(message, type = 'info') {
+      let bgColor, icon;
+      switch(type) {
+        case 'success':
+          bgColor = 'bg-green-500';
+          icon = 'fa-check-circle';
+          break;
+        case 'warning':
+          bgColor = 'bg-amber-500';
+          icon = 'fa-exclamation-triangle';
+          break;
+        case 'error':
+          bgColor = 'bg-red-500';
+          icon = 'fa-times-circle';
+          break;
+        default:
+          bgColor = 'bg-blue-500';
+          icon = 'fa-info-circle';
+      }
+      notification.className = `fixed bottom-6 right-6 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50`;
+      notification.innerHTML = `<i class="fa ${icon} mr-2"></i>${message}`;
+      setTimeout(() => {
+        notification.classList.remove('translate-y-20', 'opacity-0');
+      }, 10);
+      setTimeout(() => {
+        notification.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+    
+    // 绑定事件监听
+    removeEmptyLinesBtn.addEventListener('click', removeEmptyLines);
+    removeNumberBracketsBtn.addEventListener('click', removeNumberBrackets);
+    removeBothBtn.addEventListener('click', removeBoth);
+    removeAllParenthesesBtn.addEventListener('click', removeAllParentheses);
+    removeSequenceWordsBtn.addEventListener('click', removeSequenceWords);
+    copyResultBtn.addEventListener('click', copyResult);
+    clearAllBtn.addEventListener('click', clearAll);
+    
+    originalText.focus();
+    
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        removeEmptyLines();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        removeNumberBrackets();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        removeBoth();
+      }
+      // 新增快捷键
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        removeAllParentheses();
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        removeSequenceWords();
+      }
+    });
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本处理工具</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  
+  <!-- 配置Tailwind自定义颜色和字体 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4F46E5', // 深紫蓝色，更显专业
+            secondary: '#10B981',
+            tertiary: '#EC4899', // 亮粉色，区分同时去除功能
+            quaternary: '#8B5CF6', // 新按钮颜色1 - 紫色
+            quinary: '#F59E0B', // 新按钮颜色2 - 橙色
+            neutral: '#1F2937',
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  
+  <!-- 自定义工具类 -->
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .text-shadow {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .card-hover {
+        transition: all 0.3s ease;
+      }
+      .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 20px -10px rgba(0, 0, 0, 0.1);
+      }
+    }
+  </style>
+  
+  <style>
+    /* 全局样式 */
+    body {
+      background-color: #f9fafb;
+      background-image: 
+        radial-gradient(at 40% 20%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.05) 0px, transparent 50%);
+      position: relative; /* 为水印定位做准备 */
+      margin: 0; /* 清除默认边距，避免水印偏移 */
+    }
+    
+    /* 全屏IP水印样式 */
+    #ipWatermark {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw; /* 100%视口宽度，无横向空白 */
+      height: 100vh; /* 100%视口高度，无纵向空白 */
+      z-index: 60; /* 高于所有内容，确保顶层显示 */
+      pointer-events: none; /* 穿透点击，不影响下层操作 */
+      background-repeat: repeat; /* 密集重复，无空白 */
+      opacity: 0.25; /* 保持原透明度，灰色更柔和 */
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* 防止水印溢出 */
+    }
+    
+    /* 文本框样式 - 添加黑色实线边框 */
+    textarea {
+      resize: vertical;
+      min-height: 280px;
+      max-height: 500px;
+      line-height: 1.6;
+      border: 2px solid #000000 !important; /* 添加黑色实线边框 */
+    }
+    
+    /* 按钮动画效果 */
+    .btn-effect {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-effect:hover {
+      transform: translateY(-2px);
+    }
+    
+    .btn-effect::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      transform: scale(0, 0) translate(-50%, -50%);
+      opacity: 0;
+    }
+    
+    .btn-effect:active::after {
+      animation: ripple 0.6s ease-out;
+    }
+    
+    @keyframes ripple {
+      0% {
+        transform: scale(0, 0) translate(-50%, -50%);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(50, 50) translate(-50%, -50%);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen font-inter text-neutral antialiased">
+  <!-- IP水印容器 -->
+  <div id="ipWatermark"></div>
+
+  <div class="container mx-auto px-4 py-8 max-w-6xl relative z-20"> <!-- 内容层级低于水印 -->
+    <!-- 页面标题 -->
+    <header class="text-center mb-10">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-primary mb-3 text-shadow">文本处理工具</h1>
+      <p class="text-gray-600 max-w-2xl mx-auto">高效处理文本内容，支持多种文本清理和格式处理功能</p>
+    </header>
+    
+    <main class="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-10 card-hover">
+      <!-- 文本框区域 - 左右布局，增加间距 -->
+      <div class="flex flex-col md:flex-row gap-8 mb-10">
+        <!-- 输入区域 - 增加卡片感 -->
+        <div class="flex-1">
+          <label for="originalText" class="block text-lg font-medium text-gray-700 mb-3 flex items-center">
+            <i class="fa fa-file-text-o mr-2 text-primary"></i>原文本
+          </label>
+          <div class="relative">
+            <textarea 
+              id="originalText" 
+              class="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none shadow-sm transition-all"
+              placeholder="请输入需要处理的文本内容..."
+            ></textarea>
+            <!-- 装饰性元素 -->
+            <div class="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 border-primary/20 rounded-br-xl"></div>
+          </div>
+        </div>
+        
+        <!-- 输出区域 -->
+        <div class="flex-1">
+          <label for="modifiedText" class="block text-lg font-medium text-gray-700 mb-3 flex items-center">
+            <i class="fa fa-file-text mr-2 text-secondary"></i>处理后的文本
+          </label>
+          <div class="relative">
+            <textarea 
+              id="modifiedText" 
+              class="w-full px-4 py-4 border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none shadow-sm transition-all"
+              placeholder="处理后的文本将显示在这里..."
+              readonly
+            ></textarea>
+            <!-- 装饰性元素 -->
+            <div class="absolute -bottom-1 -right-1 w-8 h-8 border-b-2 border-r-2 border-secondary/20 rounded-br-xl"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 按钮区域 - 优化布局，避免遮挡 -->
+      <div class="flex flex-wrap justify-center gap-4 md:gap-6 py-2">
+        <button 
+          id="removeEmptyLines" 
+          class="btn-effect bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-eraser mr-2"></i>去除空行
+        </button>
+        <button 
+          id="removeNumberBrackets" 
+          class="btn-effect bg-secondary hover:bg-secondary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-square-o mr-2"></i>去除含数字的[]
+        </button>
+        <button 
+          id="removeBoth" 
+          class="btn-effect bg-tertiary hover:bg-tertiary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-magic mr-2"></i>同时去除
+        </button>
+        <!-- 新增按钮1：去除所有圆括号内容 -->
+        <button 
+          id="removeAllParentheses" 
+          class="btn-effect bg-quaternary hover:bg-quaternary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-parenthesis mr-2"></i>去除圆括号
+        </button>
+        <!-- 新增按钮2：去除顺序词及其标点 -->
+        <button 
+          id="removeSequenceWords" 
+          class="btn-effect bg-quinary hover:bg-quinary/90 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-list-ol mr-2"></i>去除顺序词
+        </button>
+        <button 
+          id="copyResult" 
+          class="btn-effect bg-gray-700 hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-copy mr-2"></i>复制结果
+        </button>
+        <button 
+          id="clearAll" 
+          class="btn-effect bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-3 rounded-lg shadow transition-all flex items-center"
+        >
+          <i class="fa fa-trash mr-2"></i>清空全部
+        </button>
+      </div>
+    </main>
+    
+    <!-- 说明区域 - 卡片式设计 -->
+    <div class="bg-white rounded-xl p-6 shadow-md mb-12">
+      <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center">
+        <i class="fa fa-info-circle text-primary mr-2"></i>功能说明
+      </h2>
+      <ul class="space-y-3 text-gray-600">
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-primary mt-1 mr-3"></i>
+          <span><strong>去除空行：</strong>删除文本中所有空行，包括连续的空行，保留有效内容的排版结构。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+          <span><strong>去除含数字的[]：</strong>智能识别并删除包含数字的方括号（如[123]、[45a6]），保留仅包含字母的方括号（如[abc]）。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-tertiary mt-1 mr-3"></i>
+          <span><strong>同时去除：</strong>一次性执行上述两种操作，先去除空行再处理含数字的方括号。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-quaternary mt-1 mr-3"></i>
+          <span><strong>去除圆括号：</strong>删除文本中所有圆括号及其内容，包括中文（）和英文()圆括号。</span>
+        </li>
+        <li class="flex items-start">
+          <i class="fa fa-check-circle text-quinary mt-1 mr-3"></i>
+          <span><strong>去除顺序词：</strong>删除"首先"、"其次"、"再次"、"此外"、"同时"、"最后"等顺序词及其后面的标点符号。</span>
+        </li>
+      </ul>
+    </div>
+    
+    <!-- 页脚 -->
+    <footer class="text-center text-gray-500 text-sm pb-6">
+      <p>© 2025 Vincent. 版权所有</p>
+    </footer>
+  </div>
+
+  <!-- 通知提示组件 -->
+  <div id="notification" class="fixed bottom-6 right-6 px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50"></div>
+
+  <!-- JavaScript功能实现 -->
+  <script>
+    // 获取DOM元素
+    const originalText = document.getElementById('originalText');
+    const modifiedText = document.getElementById('modifiedText');
+    const removeEmptyLinesBtn = document.getElementById('removeEmptyLines');
+    const removeNumberBracketsBtn = document.getElementById('removeNumberBrackets');
+    const removeBothBtn = document.getElementById('removeBoth');
+    const removeAllParenthesesBtn = document.getElementById('removeAllParentheses'); // 新按钮1
+    const removeSequenceWordsBtn = document.getElementById('removeSequenceWords'); // 新按钮2
+    const copyResultBtn = document.getElementById('copyResult');
+    const clearAllBtn = document.getElementById('clearAll');
+    const notification = document.getElementById('notification');
+    const ipWatermark = document.getElementById('ipWatermark'); // 水印元素
+    
     // 根据屏幕大小计算水印数量和字体大小
     function calculateWatermarkDensity() {
       const screenWidth = window.innerWidth;
@@ -505,3 +1074,4 @@
   </script>
 </body>
 </html>
+
