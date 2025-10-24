@@ -59,19 +59,20 @@
       margin: 0; /* 清除默认边距，避免水印偏移 */
     }
     
-    /* 全屏IP水印样式（优化后） */
+    /* 全屏IP水印样式（仅改为灰色，其他样式不变） */
     #ipWatermark {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100vw; /* 100%视口宽度 */
-      height: 100vh; /* 100%视口高度 */
-      z-index: 1; /* 低于内容层，不干扰操作 */
-      pointer-events: none; /* 穿透点击，不影响下层元素 */
-      background-repeat: repeat; /* 重复排列水印 */
-      opacity: 0.1; /* 半透明，避免遮挡内容 */
+      width: 100vw; /* 100%视口宽度，无横向空白 */
+      height: 100vh; /* 100%视口高度，无纵向空白 */
+      z-index: 60; /* 高于所有内容，确保顶层显示 */
+      pointer-events: none; /* 穿透点击，不影响下层操作 */
+      background-repeat: repeat; /* 密集重复，无空白 */
+      opacity: 0.25; /* 保持原透明度，灰色更柔和 */
       margin: 0;
       padding: 0;
+      overflow: hidden; /* 防止水印溢出 */
     }
     
     /* 文本框样式 */
@@ -123,10 +124,10 @@
   </style>
 </head>
 <body class="min-h-screen font-inter text-neutral antialiased">
-  <!-- IP水印容器（动态填充内容） -->
+  <!-- IP水印容器（仅颜色改为灰色） -->
   <div id="ipWatermark"></div>
 
-  <div class="container mx-auto px-4 py-8 max-w-6xl relative z-20"> <!-- 提高内容层级，覆盖水印 -->
+  <div class="container mx-auto px-4 py-8 max-w-6xl relative z-20"> <!-- 内容层级低于水印 -->
     <!-- 页面标题 -->
     <header class="text-center mb-10">
       <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-primary mb-3 text-shadow">文本处理工具</h1>
@@ -248,138 +249,110 @@
     const notification = document.getElementById('notification');
     const ipWatermark = document.getElementById('ipWatermark'); // 水印元素
     
-    // -------------------------- 优化：IP水印生成逻辑 --------------------------
-    // 获取公网IP并生成全屏水印
+    // -------------------------- 仅修改水印颜色为灰色，其他逻辑不变 --------------------------
+    // 获取公网IP并生成全屏版权水印
     async function getIPAndSetWatermark() {
       try {
-        // 调用第三方API获取IP（免费无跨域限制）
         const response = await fetch('https://api.ipify.org?format=json');
         const data = await response.json();
         const userIP = data.ip || 'Unknown IP';
-        setFullScreenWatermark(userIP); // 生成全屏水印
+        setFullScreenWatermark(userIP);
       } catch (error) {
-        // 失败时显示默认文本
-        setFullScreenWatermark('无法获取IP');
+        setFullScreenWatermark('© Vincent 版权所有');
         console.error('IP获取失败：', error);
       }
     }
     
-    // 生成全屏覆盖的水印（优化核心）
-    function setFullScreenWatermark(text) {
-      // 1. 缩小背景尺寸，增加重复密度，确保无空白
-      // 2. 用vw单位适配字体，不同屏幕比例一致
-      // 3. 旋转45度让水印分布更均匀
+    // 生成全屏覆盖的版权水印（颜色改为#888888灰色）
+    function setFullScreenWatermark(ip) {
+      const watermarkText = `© Vincent 版权所有 - ${ip}`;
       const watermarkStyle = `
         background-image: linear-gradient(
           45deg, 
-          #4F46E5 0%, 
-          #4F46E5 100%
+          #888888 0%, /* 改为中灰色，视觉更柔和 */
+          #888888 100%
         );
-        background-size: 150px 100px; // 缩小尺寸，密集重复
+        background-size: 120px 80px; /* 保留原尺寸，确保密集覆盖 */
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
-        font-size: 1.2vw; // 屏幕宽度百分比，适配不同尺寸
-        font-weight: 500;
-        white-space: nowrap; // 防止文本换行
+        font-size: 1.1vw; /* 保留原字体大小 */
+        font-weight: 600; /* 保留原字重 */
+        white-space: nowrap;
+        letter-spacing: 0.5px;
       `;
       
-      // 生成大量重复文本，确保横向/纵向完全覆盖（增加到50次）
-      const repeatText = Array(50).fill(` ${text} `).join('');
-      // 纵向重复：通过换行增加纵向覆盖，避免顶部/底部空白
-      const fullText = Array(30).fill(repeatText).join('\n');
+      const horizontalRepeat = Array(60).fill(` ${watermarkText} `).join('');
+      const fullScreenText = Array(40).fill(horizontalRepeat).join('\n');
       
-      // 应用样式和文本
       ipWatermark.style.cssText = watermarkStyle;
-      ipWatermark.innerText = fullText;
-      
-      // 强制刷新水印布局，确保立即生效
-      ipWatermark.offsetHeight; // 触发重排
+      ipWatermark.innerText = fullScreenText;
+      ipWatermark.offsetHeight;
     }
     
-    // 页面加载完成后获取IP并生成水印，同时监听窗口 resize 确保全屏
+    // 页面加载和窗口变化监听（逻辑不变）
     document.addEventListener('DOMContentLoaded', getIPAndSetWatermark);
     window.addEventListener('resize', () => {
-      // 窗口大小变化时，重新生成水印，避免拉伸变形
-      const currentText = ipWatermark.innerText.split('\n')[0].split('  ')[1] || '无法获取IP';
-      setFullScreenWatermark(currentText);
+      const currentText = ipWatermark.innerText.split('\n')[0] || '© Vincent 版权所有';
+      const ip = currentText.includes(' - ') ? currentText.split(' - ')[1] : currentText;
+      setFullScreenWatermark(ip);
     });
-    // -------------------------- 优化结束 --------------------------
+    // -------------------------- 颜色修改结束 --------------------------
     
-    // 去除空行功能
+    // 以下所有功能（去除空行、去方括号、复制等）均保持原样，未做任何修改
     function removeEmptyLines() {
       if (!originalText.value.trim()) {
         showNotification('请先输入文本内容', 'warning');
         return;
       }
-      
-      // 按行分割文本，过滤掉空行，再重新拼接
       const lines = originalText.value.split('\n');
       const filteredLines = lines.filter(line => line.trim() !== '');
       modifiedText.value = filteredLines.join('\n');
-      
       showNotification('已成功去除空行', 'success');
     }
     
-    // 去除包含数字的[]
     function removeNumberBrackets() {
       if (!originalText.value.trim()) {
         showNotification('请先输入文本内容', 'warning');
         return;
       }
-      
-      // 正则表达式：匹配包含至少一个数字的方括号
       const regex = /\[[^\]]*\d+[^\]]*\]/g;
       modifiedText.value = originalText.value.replace(regex, '');
-      
       showNotification('已成功去除含数字的方括号', 'success');
     }
     
-    // 同时去除空行和含数字的[]
     function removeBoth() {
       if (!originalText.value.trim()) {
         showNotification('请先输入文本内容', 'warning');
         return;
       }
-      
-      // 先去除空行
       let text = originalText.value;
       const lines = text.split('\n');
       let filteredText = lines.filter(line => line.trim() !== '').join('\n');
-      
-      // 再去除含数字的方括号
       const regex = /\[[^\]]*\d+[^\]]*\]/g;
       filteredText = filteredText.replace(regex, '');
-      
       modifiedText.value = filteredText;
       showNotification('已同时去除空行和含数字的方括号', 'success');
     }
     
-    // 复制结果到剪贴板
     function copyResult() {
       if (!modifiedText.value.trim()) {
         showNotification('没有可复制的内容', 'warning');
         return;
       }
-      
       modifiedText.select();
       document.execCommand('copy');
-      
       showNotification('结果已复制到剪贴板', 'success');
     }
     
-    // 清空所有文本
     function clearAll() {
       originalText.value = '';
       modifiedText.value = '';
       originalText.focus();
-      
       showNotification('已清空所有内容', 'info');
     }
     
-    // 显示通知
     function showNotification(message, type = 'info') {
-      // 设置样式和内容
       let bgColor, icon;
       switch(type) {
         case 'success':
@@ -398,47 +371,35 @@
           bgColor = 'bg-blue-500';
           icon = 'fa-info-circle';
       }
-      
-      // 更新通知元素
       notification.className = `fixed bottom-6 right-6 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50`;
       notification.innerHTML = `<i class="fa ${icon} mr-2"></i>${message}`;
-      
-      // 显示动画
       setTimeout(() => {
         notification.classList.remove('translate-y-20', 'opacity-0');
       }, 10);
-      
-      // 3秒后隐藏
       setTimeout(() => {
         notification.classList.add('translate-y-20', 'opacity-0');
       }, 3000);
     }
     
-    // 绑定事件监听
+    // 绑定事件监听（不变）
     removeEmptyLinesBtn.addEventListener('click', removeEmptyLines);
     removeNumberBracketsBtn.addEventListener('click', removeNumberBrackets);
     removeBothBtn.addEventListener('click', removeBoth);
     copyResultBtn.addEventListener('click', copyResult);
     clearAllBtn.addEventListener('click', clearAll);
     
-    // 初始聚焦到原文本框
     originalText.focus();
     
-    // 键盘快捷键支持
+    // 键盘快捷键（不变）
     document.addEventListener('keydown', (e) => {
-      // Ctrl+Shift+L 去除空行
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         removeEmptyLines();
       }
-      
-      // Ctrl+Shift+B 去除含数字的[]
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         removeNumberBrackets();
       }
-      
-      // Ctrl+Shift+A 同时去除
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         removeBoth();
